@@ -292,6 +292,7 @@ dependencies {
 
     // Image loading
     implementation(libs.bundles.coil)
+    implementation(libs.avif.penfeizhou)
     implementation(libs.subsamplingScaleImageView) {
         exclude(module = "image-decoder")
     }

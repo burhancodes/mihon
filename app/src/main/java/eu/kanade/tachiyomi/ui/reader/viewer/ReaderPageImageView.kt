@@ -383,7 +383,10 @@ open class ReaderPageImageView @JvmOverloads constructor(
                 onSuccess = { result ->
                     val drawable = result.asDrawable(context.resources)
                     setImageDrawable(drawable)
-                    (drawable as? Animatable)?.start()
+                    val animatable = drawable as? Animatable
+                    if (animatable != null && !animatable.isRunning) {
+                        animatable.start()
+                    }
                     isVisible = true
                     this@ReaderPageImageView.onImageLoaded()
                 },

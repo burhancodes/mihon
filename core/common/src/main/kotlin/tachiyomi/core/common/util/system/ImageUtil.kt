@@ -45,10 +45,30 @@ object ImageUtil {
         return openStream().use { findImageType(it) }
     }
 
+    fun findImageType(source: BufferedSource): ImageType? {
+        val peek = source.peek()
+        val header = ByteArray(64)
+        val read = peek.read(header)
+        if (read >= 12 && isAvif(header.copyOf(read))) {
+            return ImageType.AVIF
+        }
+        return findImageType(source.peek().inputStream())
+    }
+
     fun findImageType(stream: InputStream): ImageType? {
+        if (stream.markSupported()) {
+            val header = ByteArray(64)
+            stream.mark(64)
+            val read = stream.read(header)
+            stream.reset()
+            if (read >= 12 && isAvif(header.copyOf(read))) {
+                return ImageType.AVIF
+            }
+        }
         return try {
             val decoder = ImageDecoder.new(stream)
             when (decoder.format) {
+                "avif" -> ImageType.AVIF
                 "jpeg" -> ImageType.JPEG
                 "png" -> ImageType.PNG
                 "webp" -> ImageType.WEBP
@@ -64,6 +84,64 @@ object ImageUtil {
         }
     }
 
+    fun isAvif(bytes: ByteArray): Boolean {
+        if (bytes.size < 12) return false
+        if (bytes[4] != 'f'.code.toByte() ||
+            bytes[5] != 't'.code.toByte() ||
+            bytes[6] != 'y'.code.toByte() ||
+            bytes[7] != 'p'.code.toByte()
+        ) {
+            return false
+        }
+        val boxSize = ((bytes[0].toInt() and 0xFF) shl 24) or
+            ((bytes[1].toInt() and 0xFF) shl 16) or
+            ((bytes[2].toInt() and 0xFF) shl 8) or
+            (bytes[3].toInt() and 0xFF)
+        val limit = if (boxSize in 8..bytes.size) boxSize else bytes.size
+        var offset = 8
+        while (offset + 4 <= limit) {
+            val b0 = bytes[offset]
+            val b1 = bytes[offset + 1]
+            val b2 = bytes[offset + 2]
+            val b3 = bytes[offset + 3]
+            if (b0 == 'a'.code.toByte() && b1 == 'v'.code.toByte() && b2 == 'i'.code.toByte() &&
+                (b3 == 'f'.code.toByte() || b3 == 's'.code.toByte())
+            ) {
+                return true
+            }
+            offset += 4
+        }
+        return false
+    }
+
+    fun isAnimatedAvif(bytes: ByteArray): Boolean {
+        if (bytes.size < 12) return false
+        if (bytes[4] != 'f'.code.toByte() ||
+            bytes[5] != 't'.code.toByte() ||
+            bytes[6] != 'y'.code.toByte() ||
+            bytes[7] != 'p'.code.toByte()
+        ) {
+            return false
+        }
+        val boxSize = ((bytes[0].toInt() and 0xFF) shl 24) or
+            ((bytes[1].toInt() and 0xFF) shl 16) or
+            ((bytes[2].toInt() and 0xFF) shl 8) or
+            (bytes[3].toInt() and 0xFF)
+        val limit = if (boxSize in 8..bytes.size) boxSize else bytes.size
+        var offset = 8
+        while (offset + 4 <= limit) {
+            if (bytes[offset] == 'a'.code.toByte() &&
+                bytes[offset + 1] == 'v'.code.toByte() &&
+                bytes[offset + 2] == 'i'.code.toByte() &&
+                bytes[offset + 3] == 's'.code.toByte()
+            ) {
+                return true
+            }
+            offset += 4
+        }
+        return false
+    }
+
     fun getExtensionFromMimeType(mime: String?, openStream: () -> InputStream): String {
         val type = mime?.let { ImageType.entries.find { it.mime == mime } } ?: findImageType(openStream)
         return type?.extension ?: "jpg"
@@ -71,6 +149,13 @@ object ImageUtil {
 
     fun isAnimatedAndSupported(source: BufferedSource): Boolean {
         return try {
+            val peek = source.peek()
+            val header = ByteArray(64)
+            val read = peek.read(header)
+            if (read >= 12 && isAnimatedAvif(header.copyOf(read))) {
+                return true
+            }
+
             val type = findImageType(source.peek().inputStream()) ?: return false
             when (type) {
                 ImageType.GIF -> true
@@ -78,6 +163,14 @@ object ImageUtil {
                     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
                     val decoder = ImageDecoder.new(source.peek().inputStream())
                     decoder.pages > 1
+                }
+                ImageType.AVIF -> {
+                    if (read >= 12 && isAnimatedAvif(header.copyOf(read))) {
+                        true
+                    } else {
+                        val decoder = ImageDecoder.new(source.peek().inputStream())
+                        decoder.pages > 1
+                    }
                 }
 
                 else -> false
