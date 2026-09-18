@@ -217,6 +217,30 @@ class ReaderPreferences(
 
     // endregion
 
+    // region Translation
+
+    val liveTranslation: Preference<Boolean> = preferenceStore.getBoolean(
+        "pref_reader_live_translation_key",
+        false,
+    )
+
+    val translationProvider: Preference<String> = preferenceStore.getString(
+        "pref_reader_translation_provider_key",
+        "google",
+    )
+
+    val translationTargetLanguage: Preference<String> = preferenceStore.getString(
+        "pref_reader_translation_target_lang_key",
+        "ENG",
+    )
+
+    val languageToolUrl: Preference<String> = preferenceStore.getString(
+        "pref_reader_languagetool_url_key",
+        "",
+    )
+
+    // endregion
+
     enum class FlashColor {
         BLACK,
         WHITE,
@@ -340,5 +364,26 @@ class ReaderPreferences(
                 )
             }
         }
+
+        val translationLanguages = linkedMapOf(
+            "ENG" to "English",
+            "CHS" to "Chinese (Simplified)",
+            "CHT" to "Chinese (Traditional)",
+            "CSY" to "Czech",
+            "NLD" to "Dutch",
+            "FRA" to "French",
+            "DEU" to "German",
+            "HUN" to "Hungarian",
+            "ITA" to "Italian",
+            "JPN" to "Japanese",
+            "KOR" to "Korean",
+            "POL" to "Polish",
+            "PTB" to "Portuguese (Brazil)",
+            "ROM" to "Romanian",
+            "RUS" to "Russian",
+            "ESP" to "Spanish",
+            "TRK" to "Turkish",
+            "VIN" to "Vietnamese",
+        )
     }
 }

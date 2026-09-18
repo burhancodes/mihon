@@ -132,6 +132,38 @@ internal fun ColumnScope.GeneralPage(viewModel: ReaderSettingsViewModel) {
         pref = viewModel.preferences.pageTransitions,
     )
 
+    val liveTranslation by viewModel.preferences.liveTranslation.collectAsState()
+    CheckboxItem(
+        label = stringResource(MR.strings.pref_live_translation),
+        pref = viewModel.preferences.liveTranslation,
+    )
+    if (liveTranslation) {
+        val provider by viewModel.preferences.translationProvider.collectAsState()
+        SettingsChipRow(MR.strings.pref_translation_provider) {
+            FilterChip(
+                selected = provider == "google",
+                onClick = { viewModel.preferences.translationProvider.set("google") },
+                label = { Text(stringResource(MR.strings.pref_translation_provider_google)) },
+            )
+            FilterChip(
+                selected = provider == "yandex",
+                onClick = { viewModel.preferences.translationProvider.set("yandex") },
+                label = { Text(stringResource(MR.strings.pref_translation_provider_yandex)) },
+            )
+        }
+
+        val targetLang by viewModel.preferences.translationTargetLanguage.collectAsState()
+        SettingsChipRow(MR.strings.pref_translation_target_language) {
+            ReaderPreferences.translationLanguages.forEach { (code, name) ->
+                FilterChip(
+                    selected = targetLang == code,
+                    onClick = { viewModel.preferences.translationTargetLanguage.set(code) },
+                    label = { Text(name) },
+                )
+            }
+        }
+    }
+
     CheckboxItem(
         label = stringResource(MR.strings.pref_flash_page),
         pref = viewModel.preferences.flashOnPageChange,

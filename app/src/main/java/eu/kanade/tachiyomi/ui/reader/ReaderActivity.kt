@@ -327,6 +327,7 @@ class ReaderActivity : BaseActivity() {
                     onSetAsCover = viewModel::setAsCover,
                     onShare = viewModel::shareImage,
                     onSave = viewModel::saveImage,
+                    onTranslate = viewModel::translateSelectedPage,
                 )
             }
             null -> {}

@@ -14,4 +14,9 @@
                 tools:ignore="AcceptsUserCertificates" />
         </trust-anchors>
     </base-config>
+
+    <!-- LanguageTool self-hosted grammar correction server -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">lang.burhanverse.eu.org</domain>
+    </domain-config>
 </network-security-config>

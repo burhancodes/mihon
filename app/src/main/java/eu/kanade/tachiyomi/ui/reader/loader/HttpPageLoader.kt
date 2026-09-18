@@ -2,10 +2,12 @@ package eu.kanade.tachiyomi.ui.reader.loader
 
 import eu.kanade.tachiyomi.data.cache.ChapterCache
 import eu.kanade.tachiyomi.data.database.models.toDomainChapter
+import eu.kanade.tachiyomi.data.translation.TranslationManager
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.reader.model.ReaderChapter
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
+import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +32,8 @@ internal class HttpPageLoader(
     private val chapter: ReaderChapter,
     private val source: HttpSource,
     private val chapterCache: ChapterCache,
+    private val translationManager: TranslationManager? = null,
+    private val readerPreferences: ReaderPreferences? = null,
 ) : PageLoader() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -186,6 +190,24 @@ internal class HttpPageLoader(
 
             page.stream = { chapterCache.getImageFile(imageUrl).inputStream() }
             page.status = Page.State.Ready
+
+            if (readerPreferences?.liveTranslation?.get() == true && translationManager != null) {
+                val targetLang = readerPreferences.translationTargetLanguage.get()
+                val srcLang = when {
+                    source.lang.startsWith("ko", ignoreCase = true) -> "ko"
+                    source.lang.startsWith("zh", ignoreCase = true) -> "zh"
+                    source.lang.startsWith("ja", ignoreCase = true) -> "ja"
+                    else -> source.lang
+                }
+                translationManager.preloadTranslation(
+                    chapterId = chapter.chapter.id,
+                    chapterUrl = chapter.chapter.url,
+                    pageIndex = page.index,
+                    targetLang = targetLang,
+                    rawImageBytesProvider = { chapterCache.getImageFile(imageUrl).readBytes() },
+                    sourceLang = srcLang,
+                )
+            }
         } catch (e: Throwable) {
             page.status = Page.State.Error(e)
             if (e is CancellationException) {

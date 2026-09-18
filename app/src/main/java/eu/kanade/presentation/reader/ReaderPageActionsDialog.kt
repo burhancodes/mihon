@@ -18,6 +18,7 @@ import eu.kanade.presentation.components.AdaptiveSheet
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.ContentCopy
 import mihon.icons.materialsymbols.rounded.Photo
+import mihon.icons.materialsymbols.rounded.Public
 import mihon.icons.materialsymbols.rounded.Save
 import mihon.icons.materialsymbols.rounded.Share
 import tachiyomi.i18n.MR
@@ -31,6 +32,7 @@ fun ReaderPageActionsDialog(
     onSetAsCover: () -> Unit,
     onShare: (Boolean) -> Unit,
     onSave: () -> Unit,
+    onTranslate: () -> Unit,
 ) {
     var showSetCoverDialog by remember { mutableStateOf(false) }
 
@@ -39,6 +41,15 @@ fun ReaderPageActionsDialog(
             modifier = Modifier.padding(vertical = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
         ) {
+            ActionButton(
+                modifier = Modifier.weight(1f),
+                title = stringResource(MR.strings.action_translate_page),
+                icon = MaterialSymbols.Rounded.Public,
+                onClick = {
+                    onTranslate()
+                    onDismissRequest()
+                },
+            )
             ActionButton(
                 modifier = Modifier.weight(1f),
                 title = stringResource(MR.strings.set_as_cover),

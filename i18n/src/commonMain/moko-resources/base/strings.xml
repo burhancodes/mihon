@@ -1099,4 +1099,24 @@
     <string name="donationCampaign.paragraph3">Regardless, Mihon will continue to be maintained by me and the volunteers, and it will stay open source.</string>
     <string name="donationCampaign.contactPlatform">Discord</string>
     <string name="donationCampaign.dismiss">Dismiss</string>
+
+    <!-- Live Translation -->
+    <string name="pref_category_translation">Translation</string>
+    <string name="pref_live_translation">Live translation</string>
+    <string name="pref_live_translation_summary">Automatically translate manga pages using on-device OCR and REST translation</string>
+    <string name="pref_translation_provider">Translation provider</string>
+    <string name="pref_translation_provider_google">Google Translate</string>
+    <string name="pref_translation_provider_yandex">Yandex Translate</string>
+    <string name="pref_translation_target_language">Target language</string>
+    <string name="pref_languagetool_url">Grammar correction server</string>
+    <string name="pref_languagetool_url_summary">LanguageTool URL (e.g. https://lang.burhanverse.eu.org). Leave empty to disable.</string>
+    <string name="pref_clear_translation_cache">Clear translation cache</string>
+    <string name="pref_clear_translation_cache_summary">Used: %s</string>
+    <string name="pref_clear_translation_cache_completed">Translation cache cleared</string>
+    <string name="action_translate_page">Translate</string>
+    <string name="translation_translating">Translating page…</string>
+    <string name="translation_failed">Translation failed: %s</string>
+    <string name="translation_no_text">No text detected on page</string>
+    <string name="translation_success">Page translated</string>
+    <string name="translation_ocr_detected">Detected %d speech bubbles</string>
 </resources>

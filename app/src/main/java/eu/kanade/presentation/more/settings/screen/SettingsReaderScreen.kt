@@ -1,9 +1,12 @@
 package eu.kanade.presentation.more.settings.screen
 
+import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import eu.kanade.presentation.more.settings.Preference
@@ -11,6 +14,7 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReaderOrientation
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import eu.kanade.tachiyomi.util.system.hasDisplayCutout
+import eu.kanade.tachiyomi.util.system.toast
 import mihon.app.di.appGraph
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.pluralStringResource
@@ -66,6 +70,7 @@ object SettingsReaderScreen : SearchableSettings {
             getWebtoonGroup(readerPreferences = readerPref),
             getNavigationGroup(readerPreferences = readerPref),
             getActionsGroup(readerPreferences = readerPref),
+            getTranslationGroup(context = context, readerPreferences = readerPref),
         )
     }
 
@@ -436,6 +441,57 @@ object SettingsReaderScreen : SearchableSettings {
                     preference = readerPreferences.folderPerManga,
                     title = stringResource(MR.strings.pref_create_folder_per_manga),
                     subtitle = stringResource(MR.strings.pref_create_folder_per_manga_summary),
+                ),
+            ),
+        )
+    }
+
+    @Composable
+    private fun getTranslationGroup(
+        context: Context,
+        readerPreferences: ReaderPreferences,
+    ): Preference.PreferenceGroup {
+        val translationCache = remember { context.appGraph.translationCache }
+        var cacheSize by remember { mutableStateOf(translationCache.readableSize) }
+        val liveTranslationEnabled by readerPreferences.liveTranslation.collectAsState()
+
+        return Preference.PreferenceGroup(
+            title = stringResource(MR.strings.pref_category_translation),
+            preferenceItems = listOf(
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = readerPreferences.liveTranslation,
+                    title = stringResource(MR.strings.pref_live_translation),
+                    subtitle = stringResource(MR.strings.pref_live_translation_summary),
+                ),
+                Preference.PreferenceItem.ListPreference(
+                    preference = readerPreferences.translationProvider,
+                    entries = mapOf(
+                        "google" to stringResource(MR.strings.pref_translation_provider_google),
+                        "yandex" to stringResource(MR.strings.pref_translation_provider_yandex),
+                    ),
+                    title = stringResource(MR.strings.pref_translation_provider),
+                    enabled = liveTranslationEnabled,
+                ),
+                Preference.PreferenceItem.ListPreference(
+                    preference = readerPreferences.translationTargetLanguage,
+                    entries = ReaderPreferences.translationLanguages,
+                    title = stringResource(MR.strings.pref_translation_target_language),
+                    enabled = liveTranslationEnabled,
+                ),
+                Preference.PreferenceItem.EditTextPreference(
+                    preference = readerPreferences.languageToolUrl,
+                    title = stringResource(MR.strings.pref_languagetool_url),
+                    subtitle = stringResource(MR.strings.pref_languagetool_url_summary),
+                    enabled = liveTranslationEnabled,
+                ),
+                Preference.PreferenceItem.TextPreference(
+                    title = stringResource(MR.strings.pref_clear_translation_cache),
+                    subtitle = stringResource(MR.strings.pref_clear_translation_cache_summary, cacheSize),
+                    onClick = {
+                        translationCache.clear()
+                        cacheSize = translationCache.readableSize
+                        context.toast(MR.strings.pref_clear_translation_cache_completed)
+                    },
                 ),
             ),
         )

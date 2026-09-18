@@ -35,6 +35,7 @@ import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.data.saver.Image
 import eu.kanade.tachiyomi.data.saver.ImageSaver
 import eu.kanade.tachiyomi.data.saver.Location
+import eu.kanade.tachiyomi.data.translation.TranslationManager
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.online.HttpSource
@@ -54,9 +55,11 @@ import eu.kanade.tachiyomi.util.editCover
 import eu.kanade.tachiyomi.util.lang.byteSize
 import eu.kanade.tachiyomi.util.storage.DiskUtil
 import eu.kanade.tachiyomi.util.storage.cacheImageDir
+import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -69,6 +72,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import logcat.LogPriority
+import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.preference.toggle
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.launchNonCancellable
@@ -87,6 +91,7 @@ import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.manga.interactor.GetManga
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.source.service.SourceManager
+import tachiyomi.i18n.MR
 import tachiyomi.source.local.image.LocalCoverManager
 import tachiyomi.source.local.isLocal
 import java.util.Date
@@ -121,6 +126,7 @@ class ReaderViewModel(
     private val coverCache: CoverCache,
     private val chapterCache: ChapterCache,
     private val downloadCache: DownloadCache,
+    private val translationManager: TranslationManager,
 ) : ViewModel() {
 
     @AssistedFactory
@@ -326,7 +332,16 @@ class ReaderViewModel(
                 mutableState.update { it.copy(manga = manga, source = source) }
                 if (chapterId == -1L) chapterId = initialChapterId
 
-                loader = ChapterLoader(context, downloadManager, downloadProvider, chapterCache, manga, source)
+                loader = ChapterLoader(
+                    context,
+                    downloadManager,
+                    downloadProvider,
+                    chapterCache,
+                    translationManager,
+                    readerPreferences,
+                    manga,
+                    source,
+                )
 
                 loadChapter(loader!!, chapterList.first { chapterId == it.chapter.id })
             } catch (e: Throwable) {
@@ -924,6 +939,81 @@ class ReaderViewModel(
                 SetAsCoverResult.Error
             }
             eventChannel.send(Event.SetCoverResult(result))
+        }
+    }
+
+    /**
+     * Translates the currently selected page on-demand using Manga Image Translator.
+     */
+    fun translateSelectedPage() {
+        val page = (state.value.dialog as? Dialog.PageActions)?.page
+        if (page?.status != Page.State.Ready) return
+        val chapter = getCurrentChapter() ?: return
+        val targetLang = readerPreferences.translationTargetLanguage.get()
+        val sourceLang = when {
+            source?.lang?.startsWith("ko", ignoreCase = true) == true -> "ko"
+            source?.lang?.startsWith("zh", ignoreCase = true) == true -> "zh"
+            source?.lang?.startsWith("ja", ignoreCase = true) == true -> "ja"
+            else -> source?.lang ?: "ja"
+        }
+        val rawStreamProvider = page.originalStream ?: page.stream ?: return
+
+        viewModelScope.launchIO {
+            withUIContext {
+                context.toast(MR.strings.translation_translating)
+            }
+            try {
+                val rawBytes = rawStreamProvider().use { it.readBytes() }
+                val result = translationManager.translatePage(
+                    chapterId = chapter.chapter.id,
+                    chapterUrl = chapter.chapter.url,
+                    pageIndex = page.index,
+                    targetLang = targetLang,
+                    rawImageBytesProvider = { rawBytes },
+                    force = true,
+                    sourceLang = sourceLang,
+                )
+                withUIContext {
+                    when (result) {
+                        is TranslationManager.TranslationResult.Success -> {
+                            page.isTranslated = true
+                            if (result.bubbles.isNotEmpty()) {
+                                context.toast(
+                                    context.stringResource(
+                                        MR.strings.translation_ocr_detected,
+                                        result.bubbles.size,
+                                    ),
+                                )
+                            } else {
+                                context.toast(MR.strings.translation_success)
+                            }
+                            // Reset state to trigger viewer reload for this page
+                            page.status = Page.State.Queue
+                        }
+                        is TranslationManager.TranslationResult.Skipped -> {
+                            context.toast(MR.strings.translation_no_text)
+                        }
+                        is TranslationManager.TranslationResult.Error -> {
+                            context.toast(
+                                context.stringResource(MR.strings.translation_failed, result.message),
+                            )
+                        }
+                    }
+                }
+                if (result is TranslationManager.TranslationResult.Success) {
+                    delay(100)
+                    withUIContext {
+                        page.status = Page.State.Ready
+                    }
+                    eventChannel.send(Event.ReloadViewerChapters)
+                }
+            } catch (e: Throwable) {
+                logcat(LogPriority.ERROR, e) { "Manual page translation failed" }
+                withUIContext {
+                    val errorMsg = e.message ?: "Unknown error"
+                    context.toast(context.stringResource(MR.strings.translation_failed, errorMsg))
+                }
+            }
         }
     }
 

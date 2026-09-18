@@ -3,9 +3,23 @@ on:
   push:
     tags:
       - v*
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag or version name (e.g. v0.17.0). Leave empty to auto-detect.'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Dry run: build and upload APKs only (skip creating GitHub Release)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
 
 env:
-  MIHON_GITHUB_RELEASE: true
+  MIHON_GITHUB_RELEASE: ${{ secrets.SIGNING_KEY != '' }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,19 +27,33 @@ concurrency:
 
 jobs:
   get_tag:
-    if: github.repository == 'mihonapp/mihon'
+    if: github.repository == 'mihonapp/mihon' || github.repository == 'burhancodes/mihon' || github.event_name == 'workflow_dispatch'
     name: Extract tag name
     runs-on: 'ubuntu-24.04'
     outputs:
       tag: ${{ steps.extract.outputs.tag }}
 
     steps:
+      - name: Checkout
+        if: github.event_name == 'workflow_dispatch' && (inputs.tag == '' || inputs.tag == null)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
       - name: Get tag name
         id: extract
-        run: echo "tag=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "tag=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG=$(git describe --tags --always 2>/dev/null || echo "manual-${GITHUB_SHA::7}")
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+          fi
 
   build:
-    if: github.repository == 'mihonapp/mihon'
+    if: github.repository == 'mihonapp/mihon' || github.repository == 'burhancodes/mihon' || github.event_name == 'workflow_dispatch'
     name: Build
     runs-on: 'ubuntu-24.04'
     needs: get_tag
@@ -73,7 +101,7 @@ jobs:
             mihon-x86_64-${{ needs.get_tag.outputs.tag }}.apk
 
   build_foss:
-    if: github.repository == 'mihonapp/mihon'
+    if: github.repository == 'mihonapp/mihon' || github.repository == 'burhancodes/mihon' || github.event_name == 'workflow_dispatch'
     name: Build (FOSS)
     runs-on: ubuntu-24.04
     needs: get_tag
@@ -114,7 +142,7 @@ jobs:
           path: mihon-${{ needs.get_tag.outputs.tag }}-foss.apk
 
   release:
-    if: github.repository == 'mihonapp/mihon'
+    if: (github.repository == 'mihonapp/mihon' || github.repository == 'burhancodes/mihon' || github.event_name == 'workflow_dispatch') && (github.event_name != 'workflow_dispatch' || inputs.dry_run != true)
     name: Create GitHub Release
     runs-on: ubuntu-24.04
     needs: [get_tag, build, build_foss]
@@ -137,6 +165,7 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ needs.get_tag.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           name: Mihon ${{ needs.get_tag.outputs.tag }}
           body: |
             Consider supporting the development on [Patreon](https://www.patreon.com/mihon/membership) or [OpenCollective](https://opencollective.com/mihon/contribute) to keep Mihon improving!
@@ -161,4 +190,4 @@ jobs:
             mihon-x86_64-${{ needs.get_tag.outputs.tag }}.apk
           draft: true
           prerelease: false
-          token: ${{ secrets.MIHON_BOT_TOKEN }}
+          token: ${{ secrets.MIHON_BOT_TOKEN || secrets.GITHUB_TOKEN }}
